@@ -778,7 +778,27 @@
           source: 'form'
         };
 
-        list.push(newInfluencer);
+        // --- Duplicate detection ---
+        // Check by civil ID or by Instagram/TikTok handle
+        var newIg = newInfluencer.ig.replace('@','').toLowerCase();
+        var newTt = newInfluencer.tt.replace('@','').toLowerCase();
+        var newCivil = newInfluencer.civil.trim();
+
+        var duplicates = list.filter(function(p) {
+          var sameCivil = p.civil && newCivil && p.civil.trim() === newCivil;
+          var sameIg = p.ig && newIg && p.ig.replace('@','').toLowerCase() === newIg;
+          var sameTt = p.tt && newTt && p.tt.replace('@','').toLowerCase() === newTt;
+          return sameCivil || sameIg || sameTt;
+        });
+
+        if(duplicates.length > 0) {
+          // Mark new entry as duplicate_pending instead of adding normally
+          newInfluencer.status = 'duplicate_pending';
+          newInfluencer.duplicateOf = duplicates.map(function(d){ return d.name + ' (' + d.civil + ')'; }).join(', ');
+        }
+
+        // Add new person at the BEGINNING of the list (unshift = أول الليست)
+        list.unshift(newInfluencer);
 
         // Save back to Firebase
         return fetch(FIREBASE_URL + '/' + DB_PATH + '.json', {
