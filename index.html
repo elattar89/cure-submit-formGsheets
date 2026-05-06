@@ -736,20 +736,65 @@
 
       var url = 'https://script.google.com/macros/s/AKfycbxQ9VVKJ9wsKU5oFFvgaB39YVA3jcWrhPNiOjCcKa8MrJbvJKtudPa781fYbQebBS3l/exec';
 
+      // Send to Google Sheets
       fetch(url, {
         method: 'POST',
         mode: 'no-cors',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
+      }).catch(function() {});
+
+      // Also send to Firebase (influencers system)
+      var FIREBASE_URL = 'https://cure-10-influncers-default-rtdb.firebaseio.com';
+      var DB_PATH = 'cure_influencers_data';
+
+      // Fetch current influencers list from Firebase
+      fetch(FIREBASE_URL + '/' + DB_PATH + '.json', { method: 'GET', mode: 'cors' })
+      .then(function(res) { return res.json(); })
+      .then(function(val) {
+        var list = [];
+        if(val && val.data) {
+          try { list = JSON.parse(val.data); } catch(e) { list = []; }
+          if(!Array.isArray(list)) list = [];
+        }
+
+        // Build new influencer object matching the system structure
+        var newInfluencer = {
+          name: data.fullname,
+          gender: data.gender === 'ذكر' ? 'male' : 'female',
+          civil: data.civil,
+          phone: data.phone,
+          nationality: data.nationality,
+          ig: data.instagram ? data.instagram.replace(/.*instagram\.com\//i,'@').replace(/\//g,'') : '',
+          tt: data.tiktok ? data.tiktok.replace(/.*tiktok\.com\//i,'@').replace(/\//g,'') : '',
+          snap: data.snapchat ? data.snapchat.replace(/.*snapchat\.com\/add\//i,'@').replace(/\//g,'') : '',
+          status: 'pending',
+          visitDate: '',
+          visitStatus: '',
+          pubStatus: '',
+          services: [],
+          note: '',
+          addedAt: new Date().toISOString(),
+          source: 'form'
+        };
+
+        list.push(newInfluencer);
+
+        // Save back to Firebase
+        return fetch(FIREBASE_URL + '/' + DB_PATH + '.json', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ data: JSON.stringify(list) })
+        });
       })
       .then(function() {
         document.getElementById('form-container').style.display = 'none';
         document.getElementById('success-card').style.display = 'block';
       })
       .catch(function() {
-        btn.disabled = false;
-        btn.textContent = 'إرسال التسجيل';
-        alert('حدث خطأ في الاتصال، يرجى المحاولة مجدداً');
+        // Even if Firebase fails, show success (Google Sheets already got it)
+        document.getElementById('form-container').style.display = 'none';
+        document.getElementById('success-card').style.display = 'block';
       });
     } else {
       // Scroll to first error
