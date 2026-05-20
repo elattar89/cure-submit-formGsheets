@@ -740,7 +740,7 @@
         agree_before_after: document.getElementById('agree3').checked ? 'موافق' : 'غير موافق'
       };
 
-      var GSHEET_URL = 'https://script.google.com/macros/s/AKfycbxQ9VVKJ9wsKU5oFFvgaB39YVA3jcWrhPNiOjCcKa8MrJbvJKtudPa781fYbQebBS3l/exec';
+      var GSHEET_URL = 'https://script.google.com/macros/s/AKfycby3odeHG3BJk3s4KS-cY6vCPAhl2oq76eXe84UGYjKbsFVGDGrwZGUqt92zwe5jjfPW/exec';
       var FIREBASE_URL = 'https://cure-10-influncers-default-rtdb.firebaseio.com';
       var DB_PATH = 'cure_influencers_data';
 
@@ -772,29 +772,22 @@
         document.getElementById('success-card').style.display = 'block';
       }
 
-      // STEP 1: Read Firebase to check for duplicates
-      fetch(FIREBASE_URL + '/' + DB_PATH + '.json', { method: 'GET', mode: 'cors' })
+      // STEP 1: Check GSheet for duplicates (source of truth)
+      fetch(GSHEET_URL, { method: 'GET', mode: 'cors' })
       .then(function(res) {
-        if(!res.ok) throw new Error('FIREBASE_READ_ERROR');
+        if(!res.ok) throw new Error('GSHEET_READ_ERROR');
         return res.json();
       })
       .then(function(val) {
-        var list = [];
-        if(val && val.data) {
-          try { list = JSON.parse(val.data); } catch(e) { list = []; }
-          if(!Array.isArray(list)) list = [];
-        }
+        var civils = val.civils || [];
+        var phones = val.phones || [];
 
         // STEP 2: Check for duplicates
         var newCivil = data.civil.trim();
         var newPhone = data.phone.trim().replace(/\s+/g, '');
 
-        var civilDup = list.find(function(p) {
-          return p.civil && p.civil.trim() === newCivil;
-        });
-        var phoneDup = list.find(function(p) {
-          return p.phone && p.phone.trim().replace(/\s+/g, '') === newPhone;
-        });
+        var civilDup = civils.find(function(c) { return c === newCivil; });
+        var phoneDup = phones.find(function(p) { return p.replace(/\s+/g,'') === newPhone; });
 
         if(civilDup || phoneDup) {
           var dupMsg = '';
@@ -802,7 +795,7 @@
           else if(civilDup) dupMsg = 'الرقم المدني مسجل من قبل، لا يمكن التسجيل مرة أخرى.';
           else dupMsg = 'رقم الموبايل مسجل من قبل، لا يمكن التسجيل مرة أخرى.';
           showDuplicate(dupMsg);
-          return; // stop here — nothing gets sent
+          throw new Error('DUPLICATE');
         }
 
         // STEP 3: No duplicate — build influencer object
@@ -825,40 +818,34 @@
           source: 'form'
         };
 
-        list.unshift(newInfluencer);
-
-        // STEP 4: Write to Firebase
-        return fetch(FIREBASE_URL + '/' + DB_PATH + '.json', {
-          method: 'PUT',
+        // STEP 4: Send to GSheet + Firebase in parallel
+        fetch(GSHEET_URL, {
+          method: 'POST',
+          mode: 'no-cors',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ data: JSON.stringify(list) })
-        })
-        .then(function(res) {
-          if(!res.ok) throw new Error('FIREBASE_WRITE_ERROR');
+          body: JSON.stringify(data)
+        }).catch(function() {});
 
-          // STEP 5: Firebase saved — now send to Google Sheets
-          return fetch(GSHEET_URL, {
-            method: 'POST',
-            mode: 'no-cors',
+        return fetch(FIREBASE_URL + '/' + DB_PATH + '.json', { method: 'GET', mode: 'cors' })
+        .then(function(res) { return res.json(); })
+        .then(function(fbVal) {
+          var list = [];
+          if(fbVal && fbVal.data) {
+            try { list = JSON.parse(fbVal.data); } catch(e) { list = []; }
+            if(!Array.isArray(list)) list = [];
+          }
+          list.unshift(newInfluencer);
+          return fetch(FIREBASE_URL + '/' + DB_PATH + '.json', {
+            method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
+            body: JSON.stringify({ data: JSON.stringify(list) })
           });
         })
-        .then(function() {
-          // STEP 6: Both done — show success
-          showSuccess();
-        })
-        .catch(function(err) {
-          if(err && err.message === 'FIREBASE_WRITE_ERROR') {
-            showError('حدث خطأ أثناء الحفظ، يرجى المحاولة مرة أخرى.');
-          } else {
-            // GSheets failed (no-cors so this rarely fires) — Firebase already saved, show success
-            showSuccess();
-          }
-        });
+        .then(function() { showSuccess(); })
+        .catch(function() { showSuccess(); });
       })
       .catch(function(err) {
-        // Firebase READ failed — don't send anywhere
+        if(err && err.message === 'DUPLICATE') return;
         showError('حدث خطأ في الاتصال، يرجى المحاولة مرة أخرى.');
       });
     } else {
