@@ -772,7 +772,7 @@
         document.getElementById('success-card').style.display = 'block';
       }
 
-      // STEP 1: Check GSheet for duplicates (source of truth)
+      // STEP 1: Check GSheet for duplicates
       fetch(GSHEET_URL, { method: 'GET', mode: 'cors' })
       .then(function(res) {
         if(!res.ok) throw new Error('GSHEET_READ_ERROR');
@@ -782,23 +782,13 @@
         var civils = val.civils || [];
         var phones = val.phones || [];
 
-        // STEP 2: Check for duplicates
         var newCivil = data.civil.trim();
         var newPhone = data.phone.trim().replace(/\s+/g, '');
 
-        var civilDup = civils.find(function(c) { return c === newCivil; });
-        var phoneDup = phones.find(function(p) { return p.replace(/\s+/g,'') === newPhone; });
+        var inGsheet = civils.find(function(c) { return c === newCivil; }) ||
+                       phones.find(function(p) { return p.replace(/\s+/g,'') === newPhone; });
 
-        if(civilDup || phoneDup) {
-          var dupMsg = '';
-          if(civilDup && phoneDup) dupMsg = 'الرقم المدني ورقم الموبايل مسجلَين من قبل، لا يمكن التسجيل مرة أخرى.';
-          else if(civilDup) dupMsg = 'الرقم المدني مسجل من قبل، لا يمكن التسجيل مرة أخرى.';
-          else dupMsg = 'رقم الموبايل مسجل من قبل، لا يمكن التسجيل مرة أخرى.';
-          showDuplicate(dupMsg);
-          throw new Error('DUPLICATE');
-        }
-
-        // STEP 3: No duplicate — build influencer object
+        // STEP 2: Build influencer object
         var newInfluencer = {
           name: data.fullname,
           gender: data.gender === 'ذكر' ? 'male' : 'female',
@@ -818,14 +808,7 @@
           source: 'form'
         };
 
-        // STEP 4: Send to GSheet + Firebase in parallel
-        fetch(GSHEET_URL, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data)
-        }).catch(function() {});
-
+        // STEP 3: Check Firebase
         return fetch(FIREBASE_URL + '/' + DB_PATH + '.json', { method: 'GET', mode: 'cors' })
         .then(function(res) { return res.json(); })
         .then(function(fbVal) {
@@ -834,15 +817,44 @@
             try { list = JSON.parse(fbVal.data); } catch(e) { list = []; }
             if(!Array.isArray(list)) list = [];
           }
+
+          var inFirebase = list.find(function(p) {
+            return (p.civil && p.civil.trim() === newCivil) ||
+                   (p.phone && p.phone.trim().replace(/\s+/g,'') === newPhone);
+          });
+
+          // موجود في الاتنين — وقف خالص
+          if(inGsheet && inFirebase) {
+            var dupMsg = 'الرقم المدني أو رقم الموبايل مسجل من قبل، لا يمكن التسجيل مرة أخرى.';
+            showDuplicate(dupMsg);
+            throw new Error('DUPLICATE');
+          }
+
+          // موجود في GSheet بس — ابعته لـ Firebase فقط
+          if(inGsheet && !inFirebase) {
+            list.unshift(newInfluencer);
+            return fetch(FIREBASE_URL + '/' + DB_PATH + '.json', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ data: JSON.stringify(list) })
+            }).then(function() { showSuccess(); });
+          }
+
+          // مش موجود في الاتنين — ابعته للاتنين
+          fetch(GSHEET_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+          }).catch(function() {});
+
           list.unshift(newInfluencer);
           return fetch(FIREBASE_URL + '/' + DB_PATH + '.json', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ data: JSON.stringify(list) })
-          });
-        })
-        .then(function() { showSuccess(); })
-        .catch(function() { showSuccess(); });
+          }).then(function() { showSuccess(); });
+        });
       })
       .catch(function(err) {
         if(err && err.message === 'DUPLICATE') return;
