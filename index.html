@@ -511,6 +511,12 @@
           </span>
           مسموح استخدام موسيقى فقط في الخلفية تكون هادئة ومناسبة لأجواء عيادة (الأغاني غير مسموحة)
         </li>
+        <li>
+          <span class="icon">
+            <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+          </span>
+          التصوير يكون بصوتك أنت — الـ AI Voice غير مقبول، والفيديو على موسيقى فقط بدون تعليق صوتي غير مقبول (يجب شرح جميع الخطوات خلال الزيارة بصوتك)
+        </li>
       </ul>
 
       <br/>
@@ -779,22 +785,43 @@
         };
 
         // --- Duplicate detection ---
-        // Check by civil ID or by Instagram/TikTok handle
-        var newIg = newInfluencer.ig.replace('@','').toLowerCase();
-        var newTt = newInfluencer.tt.replace('@','').toLowerCase();
         var newCivil = newInfluencer.civil.trim();
+        var newPhone = data.phone.trim().replace(/\s+/g, '');
 
-        var duplicates = list.filter(function(p) {
-          var sameCivil = p.civil && newCivil && p.civil.trim() === newCivil;
-          var sameIg = p.ig && newIg && p.ig.replace('@','').toLowerCase() === newIg;
-          var sameTt = p.tt && newTt && p.tt.replace('@','').toLowerCase() === newTt;
-          return sameCivil || sameIg || sameTt;
+        var civilDup = list.find(function(p) {
+          return p.civil && p.civil.trim() === newCivil;
         });
 
-        if(duplicates.length > 0) {
-          // Mark new entry as duplicate_pending instead of adding normally
-          newInfluencer.status = 'duplicate_pending';
-          newInfluencer.duplicateOf = duplicates.map(function(d){ return d.name + ' (' + d.civil + ')'; }).join(', ');
+        var phoneDup = list.find(function(p) {
+          return p.phone && p.phone.trim().replace(/\s+/g, '') === newPhone;
+        });
+
+        if(civilDup || phoneDup) {
+          // Block registration — show error to user
+          var btn = document.querySelector('.submit-btn');
+          btn.disabled = false;
+          btn.textContent = 'إرسال التسجيل';
+
+          var dupMsg = '';
+          if(civilDup && phoneDup) {
+            dupMsg = 'الرقم المدني ورقم الموبايل مسجلَين من قبل، لا يمكن التسجيل مرة أخرى.';
+          } else if(civilDup) {
+            dupMsg = 'الرقم المدني مسجل من قبل، لا يمكن التسجيل مرة أخرى.';
+          } else {
+            dupMsg = 'رقم الموبايل مسجل من قبل، لا يمكن التسجيل مرة أخرى.';
+          }
+
+          var dupBanner = document.getElementById('dup-banner');
+          if(!dupBanner) {
+            dupBanner = document.createElement('div');
+            dupBanner.id = 'dup-banner';
+            dupBanner.style.cssText = 'background:#fef2f2;border:1.5px solid #dc2626;border-radius:12px;padding:1rem 1.2rem;margin-bottom:1.2rem;color:#991b1b;font-size:0.9rem;font-weight:600;text-align:center;line-height:1.6;';
+            var submitBtn = document.querySelector('.submit-btn');
+            submitBtn.parentNode.insertBefore(dupBanner, submitBtn);
+          }
+          dupBanner.textContent = '⚠️ ' + dupMsg;
+          dupBanner.scrollIntoView({behavior:'smooth', block:'center'});
+          return;
         }
 
         // Add new person at the BEGINNING of the list (unshift = أول الليست)
