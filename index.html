@@ -718,8 +718,8 @@
         <div class="check-icon">
           <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
         </div>
-        <h3>شكراً للتسجيل!</h3>
-        <p>تم استلام طلبك بنجاح، سيتم التواصل معك قريباً.</p>
+        <h3 id="success-title">شكراً للتسجيل!</h3>
+        <p id="success-msg">تم استلام طلبك بنجاح، سيتم التواصل معك قريباً.</p>
       </div>
 
     </div>
@@ -851,12 +851,17 @@
         dupBanner.scrollIntoView({behavior:'smooth', block:'center'});
       }
 
-      function showSuccess(msg) {
+      function showSuccess(msg, isUpdate) {
         document.getElementById('form-container').style.display = 'none';
         var card = document.getElementById('success-card');
-        if(msg) {
-          var p = card.querySelector('p');
-          if(p) p.textContent = msg;
+        var title = document.getElementById('success-title');
+        var p = document.getElementById('success-msg');
+        if(isUpdate) {
+          if(title) title.textContent = 'أنت مسجل من قبل!';
+          if(p) p.textContent = msg || 'تم تحديث بياناتك بنجاح، سيتم التواصل معك قريباً.';
+        } else {
+          if(title) title.textContent = 'شكراً للتسجيل!';
+          if(p) p.textContent = msg || 'تم استلام طلبك بنجاح، سيتم التواصل معك قريباً.';
         }
         card.style.display = 'block';
       }
@@ -980,7 +985,7 @@
           // الحالة 1: GSheet ✅ كامل + Firebase ✅ كامل → تكرار
           // ═══════════════════════════════════════════════
           if(inGsheet && inFirebase && !fbIncomplete) {
-            showDuplicate('الرقم المدني أو رقم الموبايل مسجل من قبل، لا يمكن التسجيل مرة أخرى.');
+            showDuplicate('أنت مسجل من قبل، لا يمكن التسجيل مرة أخرى.');
             throw new Error('DUPLICATE');
           }
 
@@ -990,7 +995,7 @@
           if(inGsheet && inFirebase && fbIncomplete) {
             list[fbIndex] = mergeIntoRecord(fbRecord);
             return saveToFirebase(list).then(function() {
-              showSuccess('تم تحديث بياناتك بنجاح، سيتم التواصل معك قريباً.');
+              showSuccess('تم تحديث بياناتك بنجاح، سيتم التواصل معك قريباً.', true);
             });
           }
 
@@ -1011,7 +1016,7 @@
             list[fbIndex] = mergeIntoRecord(fbRecord);
             sendToGSheet();
             return saveToFirebase(list).then(function() {
-              showSuccess('تم تحديث بياناتك بنجاح، سيتم التواصل معك قريباً.');
+              showSuccess('تم تحديث بياناتك بنجاح، سيتم التواصل معك قريباً.', true);
             });
           }
 
