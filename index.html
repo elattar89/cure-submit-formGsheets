@@ -851,12 +851,67 @@
         dupBanner.scrollIntoView({behavior:'smooth', block:'center'});
       }
 
-      function showSuccess() {
+      function showSuccess(msg) {
         document.getElementById('form-container').style.display = 'none';
-        document.getElementById('success-card').style.display = 'block';
+        var card = document.getElementById('success-card');
+        if(msg) {
+          var p = card.querySelector('p');
+          if(p) p.textContent = msg;
+        }
+        card.style.display = 'block';
       }
 
-      // STEP 1: Check GSheet for duplicates
+      // دالة تشيل كود الدولة وتفضل بالأرقام بس للمقارنة
+      function stripCode(p) { return p.replace(/\s+/g,'').replace(/^\+?\d{1,4}?(?=\d{8,})/, ''); }
+
+      var newCivil = data.civil.trim();
+      var newPhone = data.phone.trim().replace(/\s+/g, '');
+      var newPhoneStripped = stripCode(newPhone);
+
+      // دالة تحدد إذا record في Firebase "ناقص" مقارنة بالبيانات الجديدة
+      function isIncomplete(record) {
+        var fields = ['ig','tt','snap','nationality','name','phone'];
+        for(var i=0; i<fields.length; i++) {
+          var f = fields[i];
+          var newVal = (newInfluencer[f] || '').trim();
+          var oldVal = (record[f] || '').trim();
+          if(newVal && !oldVal) return true;
+        }
+        return false;
+      }
+
+      // دالة تحدّث record موجود بالبيانات الجديدة (بدون تغيير status/visitDate/etc)
+      function mergeIntoRecord(record) {
+        var fields = ['name','phone','nationality','ig','tt','snap'];
+        fields.forEach(function(f) {
+          var newVal = (newInfluencer[f] || '').trim();
+          if(newVal) record[f] = newInfluencer[f];
+        });
+        record.updatedAt = new Date().toISOString();
+        return record;
+      }
+
+      // Build influencer object
+      var newInfluencer = {
+        name: data.fullname,
+        gender: data.gender === 'ذكر' ? 'male' : 'female',
+        civil: data.civil,
+        phone: data.phone,
+        nationality: data.nationality,
+        ig: data.instagram ? data.instagram.replace(/.*instagram\.com\//i,'@').replace(/\//g,'') : '',
+        tt: data.tiktok ? data.tiktok.replace(/.*tiktok\.com\//i,'@').replace(/\//g,'') : '',
+        snap: data.snapchat ? data.snapchat.replace(/.*snapchat\.com\/add\//i,'@').replace(/\//g,'') : '',
+        status: 'pending',
+        visitDate: '',
+        visitStatus: '',
+        pubStatus: '',
+        services: [],
+        note: '',
+        addedAt: new Date().toISOString(),
+        source: 'form'
+      };
+
+      // STEP 1: Check GSheet
       fetch(GSHEET_URL, { method: 'GET', mode: 'cors' })
       .then(function(res) {
         if(!res.ok) throw new Error('GSHEET_READ_ERROR');
@@ -866,36 +921,10 @@
         var civils = val.civils || [];
         var phones = val.phones || [];
 
-        var newCivil = data.civil.trim();
-        var newPhone = data.phone.trim().replace(/\s+/g, '');
-        // دالة تشيل كود الدولة وتفضل بالأرقام بس للمقارنة
-        function stripCode(p) { return p.replace(/\s+/g,'').replace(/^\+?\d{1,4}?(?=\d{8,})/, ''); }
-        var newPhoneStripped = stripCode(newPhone);
-
         var inGsheet = civils.find(function(c) { return c === newCivil; }) ||
                        phones.find(function(p) { return stripCode(p.replace(/\s+/g,'')) === newPhoneStripped; });
 
-        // STEP 2: Build influencer object
-        var newInfluencer = {
-          name: data.fullname,
-          gender: data.gender === 'ذكر' ? 'male' : 'female',
-          civil: data.civil,
-          phone: data.phone,
-          nationality: data.nationality,
-          ig: data.instagram ? data.instagram.replace(/.*instagram\.com\//i,'@').replace(/\//g,'') : '',
-          tt: data.tiktok ? data.tiktok.replace(/.*tiktok\.com\//i,'@').replace(/\//g,'') : '',
-          snap: data.snapchat ? data.snapchat.replace(/.*snapchat\.com\/add\//i,'@').replace(/\//g,'') : '',
-          status: 'pending',
-          visitDate: '',
-          visitStatus: '',
-          pubStatus: '',
-          services: [],
-          note: '',
-          addedAt: new Date().toISOString(),
-          source: 'form'
-        };
-
-        // STEP 3: Check Firebase
+        // STEP 2: Check Firebase
         return fetch(FIREBASE_URL + '/' + DB_PATH + '.json', { method: 'GET', mode: 'cors' })
         .then(function(res) { return res.json(); })
         .then(function(fbVal) {
@@ -905,42 +934,83 @@
             if(!Array.isArray(list)) list = [];
           }
 
-          var inFirebase = list.find(function(p) {
-            return (p.civil && p.civil.trim() === newCivil) ||
-                   (p.phone && stripCode(p.phone.trim().replace(/\s+/g,'')) === newPhoneStripped);
-          });
-
-          // موجود في الاتنين — وقف خالص
-          if(inGsheet && inFirebase) {
-            var dupMsg = 'الرقم المدني أو رقم الموبايل مسجل من قبل، لا يمكن التسجيل مرة أخرى.';
-            showDuplicate(dupMsg);
-            throw new Error('DUPLICATE');
+          var fbIndex = -1;
+          var fbRecord = null;
+          for(var i=0; i<list.length; i++) {
+            var p = list[i];
+            if( (p.civil && p.civil.trim() === newCivil) ||
+                (p.phone && stripCode(p.phone.trim().replace(/\s+/g,'')) === newPhoneStripped) ) {
+              fbIndex = i; fbRecord = p; break;
+            }
           }
 
-          // موجود في GSheet بس — ابعته لـ Firebase فقط
-          if(inGsheet && !inFirebase) {
-            list.unshift(newInfluencer);
+          var inFirebase = fbRecord !== null;
+          var fbIncomplete = inFirebase && isIncomplete(fbRecord);
+
+          function saveToFirebase(updatedList) {
             return fetch(FIREBASE_URL + '/' + DB_PATH + '.json', {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ data: JSON.stringify(list) })
-            }).then(function() { showSuccess(); });
+              body: JSON.stringify({ data: JSON.stringify(updatedList) })
+            });
           }
 
-          // مش موجود في الاتنين — ابعته للاتنين
-          fetch(GSHEET_URL, {
-            method: 'POST',
-            mode: 'no-cors',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-          }).catch(function() {});
+          function sendToGSheet() {
+            return fetch(GSHEET_URL, {
+              method: 'POST',
+              mode: 'no-cors',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(data)
+            }).catch(function(){});
+          }
 
+          // ═══════════════════════════════════════════════
+          // الحالة 1: GSheet ✅ كامل + Firebase ✅ كامل → تكرار
+          // ═══════════════════════════════════════════════
+          if(inGsheet && inFirebase && !fbIncomplete) {
+            showDuplicate('الرقم المدني أو رقم الموبايل مسجل من قبل، لا يمكن التسجيل مرة أخرى.');
+            throw new Error('DUPLICATE');
+          }
+
+          // ═══════════════════════════════════════════════
+          // الحالة 2: GSheet ✅ كامل + Firebase ✅ ناقص → حدّث Firebase فقط + "تم تحديث بياناتك"
+          // ═══════════════════════════════════════════════
+          if(inGsheet && inFirebase && fbIncomplete) {
+            list[fbIndex] = mergeIntoRecord(fbRecord);
+            return saveToFirebase(list).then(function() {
+              showSuccess('تم تحديث بياناتك بنجاح، سيتم التواصل معك قريباً.');
+            });
+          }
+
+          // ═══════════════════════════════════════════════
+          // الحالة 3: GSheet ✅ موجود + Firebase ❌ → أضف لـ Firebase فقط + نجاح عادي
+          // ═══════════════════════════════════════════════
+          if(inGsheet && !inFirebase) {
+            list.unshift(newInfluencer);
+            return saveToFirebase(list).then(function() {
+              showSuccess('تم استلام طلبك بنجاح، سيتم التواصل معك قريباً.');
+            });
+          }
+
+          // ═══════════════════════════════════════════════
+          // الحالة 4: GSheet ❌ + Firebase ✅ → حدّث Firebase + أضف لـ GSheet + "تم تحديث بياناتك"
+          // ═══════════════════════════════════════════════
+          if(!inGsheet && inFirebase) {
+            list[fbIndex] = mergeIntoRecord(fbRecord);
+            sendToGSheet();
+            return saveToFirebase(list).then(function() {
+              showSuccess('تم تحديث بياناتك بنجاح، سيتم التواصل معك قريباً.');
+            });
+          }
+
+          // ═══════════════════════════════════════════════
+          // الحالة 5: GSheet ❌ + Firebase ❌ → أضف للاتنين + نجاح عادي
+          // ═══════════════════════════════════════════════
+          sendToGSheet();
           list.unshift(newInfluencer);
-          return fetch(FIREBASE_URL + '/' + DB_PATH + '.json', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ data: JSON.stringify(list) })
-          }).then(function() { showSuccess(); });
+          return saveToFirebase(list).then(function() {
+            showSuccess('تم استلام طلبك بنجاح، سيتم التواصل معك قريباً.');
+          });
         });
       })
       .catch(function(err) {
