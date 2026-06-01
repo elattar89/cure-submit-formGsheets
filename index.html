@@ -888,7 +888,8 @@
         return false;
       }
 
-      // دالة تحدّث record موجود بالبيانات الجديدة (بدون تغيير الحقول الإدارية)
+      // دالة تضيف pendingUpdate للـ record بدون ما تعدّل البيانات الأصلية
+      // الداشبورد هو اللي يطبّق التغييرات بعد مراجعتك
       function mergeIntoRecord(record) {
         var fields = Object.keys(newInfluencer).filter(function(f) {
           return ADMIN_FIELDS.indexOf(f) === -1;
@@ -899,9 +900,9 @@
           var oldVal = (record[f] || '').toString().trim();
           if(newVal && newVal !== oldVal) {
             updatedFields.push({key: f, oldVal: oldVal, newVal: newVal});
-            record[f] = newInfluencer[f];
           }
         });
+        // مش بنعدل البيانات الأصلية — بس بنضيف pendingUpdate
         record.source = 'updated';
         record.updatedFields = updatedFields;
         record.updatedAt = new Date().toISOString();
