@@ -556,7 +556,84 @@
 
         <div class="field">
           <label>رقم التلفون (واتساب) <span class="req">*</span></label>
-          <input id="phone" type="tel" placeholder="+965 XXXX XXXX" /><div class="err" id="err-phone">هذا الحقل مطلوب</div>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <select id="phone-code" style="flex:0 0 auto;padding:10px 8px;border-radius:10px;border:1.5px solid #334155;background:#1e293b;color:#f1f5f9;font-family:Tajawal,sans-serif;font-size:14px;direction:ltr;max-width:145px;">
+              <option value="+965">🇰🇼 +965</option>
+              <option value="+966">🇸🇦 +966</option>
+              <option value="+971">🇦🇪 +971</option>
+              <option value="+974">🇶🇦 +974</option>
+              <option value="+968">🇴🇲 +968</option>
+              <option value="+973">🇧🇭 +973</option>
+              <option value="+962">🇯🇴 +962</option>
+              <option value="+961">🇱🇧 +961</option>
+              <option value="+963">🇸🇾 +963</option>
+              <option value="+964">🇮🇶 +964</option>
+              <option value="+967">🇾🇪 +967</option>
+              <option value="+20">🇪🇬 +20</option>
+              <option value="+212">🇲🇦 +212</option>
+              <option value="+213">🇩🇿 +213</option>
+              <option value="+216">🇹🇳 +216</option>
+              <option value="+218">🇱🇾 +218</option>
+              <option value="+249">🇸🇩 +249</option>
+              <option value="+252">🇸🇴 +252</option>
+              <option value="+91">🇮🇳 +91</option>
+              <option value="+92">🇵🇰 +92</option>
+              <option value="+880">🇧🇩 +880</option>
+              <option value="+94">🇱🇰 +94</option>
+              <option value="+977">🇳🇵 +977</option>
+              <option value="+63">🇵🇭 +63</option>
+              <option value="+62">🇮🇩 +62</option>
+              <option value="+44">🇬🇧 +44</option>
+              <option value="+33">🇫🇷 +33</option>
+              <option value="+49">🇩🇪 +49</option>
+              <option value="+1">🇺🇸 +1</option>
+              <option value="+7">🇷🇺 +7</option>
+              <option value="+86">🇨🇳 +86</option>
+              <option value="+81">🇯🇵 +81</option>
+              <option value="+82">🇰🇷 +82</option>
+              <option value="+90">🇹🇷 +90</option>
+              <option value="+98">🇮🇷 +98</option>
+              <option value="+93">🇦🇫 +93</option>
+              <option value="+880">🇧🇩 +880</option>
+              <option value="+55">🇧🇷 +55</option>
+              <option value="+52">🇲🇽 +52</option>
+              <option value="+27">🇿🇦 +27</option>
+              <option value="+234">🇳🇬 +234</option>
+              <option value="+254">🇰🇪 +254</option>
+              <option value="+256">🇺🇬 +256</option>
+              <option value="+255">🇹🇿 +255</option>
+              <option value="+251">🇪🇹 +251</option>
+              <option value="+233">🇬🇭 +233</option>
+              <option value="+237">🇨🇲 +237</option>
+              <option value="+243">🇨🇩 +243</option>
+              <option value="+39">🇮🇹 +39</option>
+              <option value="+34">🇪🇸 +34</option>
+              <option value="+31">🇳🇱 +31</option>
+              <option value="+46">🇸🇪 +46</option>
+              <option value="+47">🇳🇴 +47</option>
+              <option value="+45">🇩🇰 +45</option>
+              <option value="+358">🇫🇮 +358</option>
+              <option value="+41">🇨🇭 +41</option>
+              <option value="+43">🇦🇹 +43</option>
+              <option value="+32">🇧🇪 +32</option>
+              <option value="+351">🇵🇹 +351</option>
+              <option value="+30">🇬🇷 +30</option>
+              <option value="+48">🇵🇱 +48</option>
+              <option value="+380">🇺🇦 +380</option>
+              <option value="+40">🇷🇴 +40</option>
+              <option value="+36">🇭🇺 +36</option>
+              <option value="+420">🇨🇿 +420</option>
+              <option value="+61">🇦🇺 +61</option>
+              <option value="+64">🇳🇿 +64</option>
+              <option value="+60">🇲🇾 +60</option>
+              <option value="+65">🇸🇬 +65</option>
+              <option value="+66">🇹🇭 +66</option>
+              <option value="+84">🇻🇳 +84</option>
+              <option value="+95">🇲🇲 +95</option>
+            </select>
+            <input id="phone-num" type="tel" placeholder="XXXXXXXX" dir="ltr" style="flex:1;direction:ltr;text-align:left;" oninput="this.value=this.value.replace(/[٠-٩]/g,d=>d.charCodeAt(0)-1632).replace(/[۰-۹]/g,d=>d.charCodeAt(0)-1776).replace(/[^0-9]/g,'')" /><div class="err" id="err-phone">هذا الحقل مطلوب</div>
+          </div>
+          <input id="phone" type="hidden" />
         </div>
 
         <div class="field">
@@ -689,8 +766,12 @@
     // Phone
     var phone = document.getElementById('phone');
     var phoneErr = document.getElementById('err-phone');
-    if(!phone.value.trim()) { phone.classList.add('invalid'); phoneErr.classList.add('show'); valid = false; }
-    else { phone.classList.remove('invalid'); phoneErr.classList.remove('show'); }
+    // دمج كود الدولة مع الرقم في الحقل المخفي
+    var phoneNum = document.getElementById('phone-num');
+    var phoneCode = document.getElementById('phone-code');
+    phone.value = phoneCode.value + phoneNum.value.trim().replace(/^0+/, '');
+    if(!phoneNum.value.trim()) { phoneNum.classList.add('invalid'); phoneErr.classList.add('show'); valid = false; }
+    else { phoneNum.classList.remove('invalid'); phoneErr.classList.remove('show'); }
 
     // Nationality
     var nat = document.getElementById('nationality');
@@ -787,9 +868,12 @@
 
         var newCivil = data.civil.trim();
         var newPhone = data.phone.trim().replace(/\s+/g, '');
+        // دالة تشيل كود الدولة وتفضل بالأرقام بس للمقارنة
+        function stripCode(p) { return p.replace(/\s+/g,'').replace(/^\+?\d{1,4}?(?=\d{8,})/, ''); }
+        var newPhoneStripped = stripCode(newPhone);
 
         var inGsheet = civils.find(function(c) { return c === newCivil; }) ||
-                       phones.find(function(p) { return p.replace(/\s+/g,'') === newPhone; });
+                       phones.find(function(p) { return stripCode(p.replace(/\s+/g,'')) === newPhoneStripped; });
 
         // STEP 2: Build influencer object
         var newInfluencer = {
@@ -823,7 +907,7 @@
 
           var inFirebase = list.find(function(p) {
             return (p.civil && p.civil.trim() === newCivil) ||
-                   (p.phone && p.phone.trim().replace(/\s+/g,'') === newPhone);
+                   (p.phone && stripCode(p.phone.trim().replace(/\s+/g,'')) === newPhoneStripped);
           });
 
           // موجود في الاتنين — وقف خالص
@@ -887,6 +971,8 @@
         if(genderErr) genderErr.classList.remove('show');
       });
     });
+    document.getElementById('phone-num').value = '';
+    document.getElementById('phone-num').classList.remove('invalid');
     ['fullname','civil','phone','instagram','tiktok'].forEach(function(id){
       var el = document.getElementById(id);
       if(el) el.addEventListener('input', function(){ el.classList.remove('invalid'); document.getElementById('err-'+id).classList.remove('show'); });
