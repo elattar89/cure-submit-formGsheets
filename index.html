@@ -869,24 +869,29 @@
       var newPhoneStripped = stripCode(newPhone);
 
       // دالة تحدد إذا record في Firebase "ناقص" مقارنة بالبيانات الجديدة
+      // بتشوف كل حقل في newInfluencer تلقائياً — لو فيه قيمة جديدة والقديم فاضي = ناقص
+      var ADMIN_FIELDS = ['status','visitDate','visitStatus','pubStatus','services','note','addedAt','source','updatedAt','updatedFields'];
       function isIncomplete(record) {
-        var fields = ['ig','tt','snap','nationality','name','phone'];
+        var fields = Object.keys(newInfluencer);
         for(var i=0; i<fields.length; i++) {
           var f = fields[i];
-          var newVal = (newInfluencer[f] || '').trim();
-          var oldVal = (record[f] || '').trim();
+          if(ADMIN_FIELDS.indexOf(f) !== -1) continue;
+          var newVal = (newInfluencer[f] || '').toString().trim();
+          var oldVal = (record[f] || '').toString().trim();
           if(newVal && !oldVal) return true;
         }
         return false;
       }
 
-      // دالة تحدّث record موجود بالبيانات الجديدة (بدون تغيير status/visitDate/etc)
+      // دالة تحدّث record موجود بالبيانات الجديدة (بدون تغيير الحقول الإدارية)
       function mergeIntoRecord(record) {
-        var fields = ['name','phone','nationality','ig','tt','snap'];
+        var fields = Object.keys(newInfluencer).filter(function(f) {
+          return ADMIN_FIELDS.indexOf(f) === -1;
+        });
         var updatedFields = [];
         fields.forEach(function(f) {
-          var newVal = (newInfluencer[f] || '').trim();
-          var oldVal = (record[f] || '').trim();
+          var newVal = (newInfluencer[f] || '').toString().trim();
+          var oldVal = (record[f] || '').toString().trim();
           if(newVal && newVal !== oldVal) {
             updatedFields.push({key: f, oldVal: oldVal, newVal: newVal});
             record[f] = newInfluencer[f];
