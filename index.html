@@ -883,10 +883,17 @@
       // دالة تحدّث record موجود بالبيانات الجديدة (بدون تغيير status/visitDate/etc)
       function mergeIntoRecord(record) {
         var fields = ['name','phone','nationality','ig','tt','snap'];
+        var updatedFields = [];
         fields.forEach(function(f) {
           var newVal = (newInfluencer[f] || '').trim();
-          if(newVal) record[f] = newInfluencer[f];
+          var oldVal = (record[f] || '').trim();
+          if(newVal && newVal !== oldVal) {
+            updatedFields.push({key: f, oldVal: oldVal, newVal: newVal});
+            record[f] = newInfluencer[f];
+          }
         });
+        record.source = 'updated';
+        record.updatedFields = updatedFields;
         record.updatedAt = new Date().toISOString();
         return record;
       }
